@@ -680,6 +680,7 @@ def transformer_encoder(encoder_input,
     for layer in xrange(hparams.num_encoder_layers or
                         hparams.num_hidden_layers):
       with tf.variable_scope("layer_%d" % layer):
+        layer_input = tf.identity(x)
         with tf.variable_scope("self_attention"):
           y = common_attention.multihead_attention(
               common_layers.layer_preprocess(x, hparams),
@@ -687,7 +688,7 @@ def transformer_encoder(encoder_input,
               encoder_self_attention_bias,
               hparams.attention_key_channels or hparams.hidden_size,
               hparams.attention_value_channels or hparams.hidden_size,
-              hparams.hidden_size,
+              hparams.hidden_size + layer * hparams.growth_rate,
               hparams.num_heads,
               hparams.attention_dropout,
               attention_type=hparams.self_attention_type,
@@ -701,6 +702,9 @@ def transformer_encoder(encoder_input,
               common_layers.layer_preprocess(x, hparams), hparams, pad_remover,
               conv_padding="SAME", nonpadding_mask=nonpadding)
           x = common_layers.layer_postprocess(x, y, hparams)
+        with tf.variable_scope("dense"):
+          # maybe need postprocess but not include add
+          x = tf.concat([common_layers.layer_preprocess(x, hparams), common_layers.layer_preprocess(layer_input, hparams)], 2)
     # if normalization is done in layer_preprocess, then it shuold also be done
     # on the output, since the output can grow very large, being the sum of
     # a whole stack of unnormalized layer outputs.
@@ -753,6 +757,7 @@ def transformer_decoder(decoder_input,
       layer_name = "layer_%d" % layer
       layer_cache = cache[layer_name] if cache is not None else None
       with tf.variable_scope(layer_name):
+        layer_input = tf.identity(x)
         with tf.variable_scope("self_attention"):
           y = common_attention.multihead_attention(
               common_layers.layer_preprocess(x, hparams),
@@ -760,7 +765,7 @@ def transformer_decoder(decoder_input,
               decoder_self_attention_bias,
               hparams.attention_key_channels or hparams.hidden_size,
               hparams.attention_value_channels or hparams.hidden_size,
-              hparams.hidden_size,
+              hparams.hidden_size + layer * hparams.growth_rate,
               hparams.num_heads,
               hparams.attention_dropout,
               attention_type=hparams.self_attention_type,
@@ -773,13 +778,14 @@ def transformer_decoder(decoder_input,
         if encoder_output is not None:
           with tf.variable_scope("encdec_attention"):
             # TODO(llion): Add caching.
+            x = tf.add(tf.zeros(tf.shape(encoder_output)), x)
             y = common_attention.multihead_attention(
                 common_layers.layer_preprocess(x, hparams),
                 encoder_output,
                 encoder_decoder_attention_bias,
                 hparams.attention_key_channels or hparams.hidden_size,
                 hparams.attention_value_channels or hparams.hidden_size,
-                hparams.hidden_size,
+                tf.shape(encoder_output)[-1],
                 hparams.num_heads,
                 hparams.attention_dropout,
                 save_weights_to=save_weights_to,
@@ -791,6 +797,9 @@ def transformer_decoder(decoder_input,
               common_layers.layer_preprocess(x, hparams), hparams,
               conv_padding="LEFT", nonpadding_mask=nonpadding)
           x = common_layers.layer_postprocess(x, y, hparams)
+        with tf.variable_scope("dense"):
+          # maybe need postprocess but not include add
+          x = tf.concat([common_layers.layer_preprocess(x, hparams), common_layers.layer_preprocess(layer_input, hparams)], 2)
     # if normalization is done in layer_preprocess, then it shuold also be done
     # on the output, since the output can grow very large, being the sum of
     # a whole stack of unnormalized layer outputs.
@@ -836,7 +845,7 @@ def transformer_ffn_layer(x,
     conv_output = common_layers.dense_relu_dense(
         x,
         hparams.filter_size,
-        hparams.hidden_size,
+        hparams.growth_rate,
         dropout=hparams.relu_dropout,
         dropout_broadcast_dims=relu_dropout_broadcast_dims)
     if pad_remover:
@@ -946,6 +955,8 @@ def transformer_base():
   # transformer_base_v2.
   hparams = transformer_base_v2()
   hparams.optimizer_adam_beta2 = 0.997
+  # Transformer layer hidden size growth rate. 8, 16, 32, 64, 128, 256, 512
+  hparams.growth_rate = 32
   # New way of specifying learning rate schedule.
   # Equivalent to previous version.
   hparams.learning_rate_schedule = (
