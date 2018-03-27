@@ -683,7 +683,7 @@ def transformer_encoder(encoder_input,
     for layer in xrange(hparams.num_encoder_layers or
                         hparams.num_hidden_layers):
       with tf.variable_scope("layer_%d" % layer):
-        layer_input = tf.identity(x)
+        layer_input = common_layers.layer_preprocess(tf.identity(x), hparams)
         with tf.variable_scope("self_attention"):
           y = common_attention.multihead_attention(
               common_layers.layer_preprocess(x, hparams),
@@ -707,6 +707,9 @@ def transformer_encoder(encoder_input,
               conv_padding="SAME", nonpadding_mask=nonpadding)
           # y's depth changed to hidden_size + layer * growth_rate
           y = tf.concat([y, layer_input], 2)
+          # if last decoder layer, y's depth come back to hidden_size
+          if layer == (hparams.num_hidden_layers - 1):
+            y = common_layers.dense(y, hparams.hidden_size, use_bias=True, activation=tf.nn.relu, name="bottleneck")
           # previous_value is None, only do dropout operation
           x = common_layers.layer_postprocess(None, y, hparams)
     # if normalization is done in layer_preprocess, then it shuold also be done
@@ -761,7 +764,7 @@ def transformer_decoder(decoder_input,
       layer_name = "layer_%d" % layer
       layer_cache = cache[layer_name] if cache is not None else None
       with tf.variable_scope(layer_name):
-        layer_input = tf.identity(x)
+        layer_input = common_layers.layer_preprocess(tf.identity(x), hparams)
         with tf.variable_scope("self_attention"):
           y = common_attention.multihead_attention(
               common_layers.layer_preprocess(x, hparams),
