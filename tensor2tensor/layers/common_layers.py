@@ -615,7 +615,8 @@ def layer_prepostprocess(previous_value,
       return x
     for c in sequence:
       if c == "a":
-        x += previous_value
+        if previous_value:
+          x += previous_value
       elif c == "n":
         x = apply_norm(x, norm_type, depth, epsilon)
       else:

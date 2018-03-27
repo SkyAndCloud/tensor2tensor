@@ -702,13 +702,14 @@ def transformer_encoder(encoder_input,
               dropout_broadcast_dims=attention_dropout_broadcast_dims)
           x = common_layers.layer_postprocess(x, y, hparams)
         with tf.variable_scope("ffn"):
+          # y's depth changed to growth_rate
           y = transformer_ffn_layer(
               common_layers.layer_preprocess(x, hparams), hparams, pad_remover,
               conv_padding="SAME", nonpadding_mask=nonpadding)
-          x = common_layers.layer_postprocess(x, y, hparams)
-        with tf.variable_scope("dense"):
-          # maybe need postprocess but not include add
-          x = tf.concat([common_layers.layer_preprocess(x, hparams), common_layers.layer_preprocess(layer_input, hparams)], 2)
+          # y's depth changed to hidden_size + layer * growth_rate
+          y = tf.concat([y, layer_input], 2)
+          # previous_value is None, only do dropout operation
+          x = common_layers.layer_postprocess(None, y, hparams)
     # if normalization is done in layer_preprocess, then it shuold also be done
     # on the output, since the output can grow very large, being the sum of
     # a whole stack of unnormalized layer outputs.
@@ -801,13 +802,14 @@ def transformer_decoder(decoder_input,
                 dropout_broadcast_dims=attention_dropout_broadcast_dims)
             x = common_layers.layer_postprocess(x, y, hparams)
         with tf.variable_scope("ffn"):
+          # y's depth changed to growth_rate
           y = transformer_ffn_layer(
               common_layers.layer_preprocess(x, hparams), hparams,
               conv_padding="LEFT", nonpadding_mask=nonpadding)
-          x = common_layers.layer_postprocess(x, y, hparams)
-        with tf.variable_scope("dense"):
-          # maybe need postprocess but not include add
-          x = tf.concat([common_layers.layer_preprocess(x, hparams), common_layers.layer_preprocess(layer_input, hparams)], 2)
+          # y's depth changed to hidden_size + layer * growth_rate
+          y = tf.concat([y, layer_input], 2)
+          # previous_value is None, only do dropout operation
+          x = common_layers.layer_postprocess(None, y, hparams)
     # if normalization is done in layer_preprocess, then it shuold also be done
     # on the output, since the output can grow very large, being the sum of
     # a whole stack of unnormalized layer outputs.
