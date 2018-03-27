@@ -707,9 +707,6 @@ def transformer_encoder(encoder_input,
               conv_padding="SAME", nonpadding_mask=nonpadding)
           # y's depth changed to hidden_size + layer * growth_rate
           y = tf.concat([y, layer_input], 2)
-          # if last decoder layer, y's depth come back to hidden_size
-          if layer == (hparams.num_hidden_layers - 1):
-            y = common_layers.dense(y, hparams.hidden_size, use_bias=True, activation=tf.nn.relu, name="bottleneck")
           # previous_value is None, only do dropout operation
           x = common_layers.layer_postprocess(None, y, hparams)
     # if normalization is done in layer_preprocess, then it shuold also be done
@@ -811,6 +808,9 @@ def transformer_decoder(decoder_input,
               conv_padding="LEFT", nonpadding_mask=nonpadding)
           # y's depth changed to hidden_size + layer * growth_rate
           y = tf.concat([y, layer_input], 2)
+          # if last decoder layer, y's depth come back to hidden_size
+          if layer == (hparams.num_hidden_layers - 1):
+              y = common_layers.dense(y, hparams.hidden_size, use_bias=True, activation=tf.nn.relu, name="bottleneck")
           # previous_value is None, only do dropout operation
           x = common_layers.layer_postprocess(None, y, hparams)
     # if normalization is done in layer_preprocess, then it shuold also be done
