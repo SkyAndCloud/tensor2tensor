@@ -779,9 +779,13 @@ def transformer_decoder(decoder_input,
               dropout_broadcast_dims=attention_dropout_broadcast_dims)
           x = common_layers.layer_postprocess(x, y, hparams)
         if encoder_output is not None:
+          encoder_output_shape = tf.shape(encoder_output)
           with tf.variable_scope("encdec_attention"):
             # TODO(llion): Add caching.
-            x = tf.add(tf.zeros(tf.shape(encoder_output)), x)
+            # padding decoder to encoder shape
+            padding_depth = encoder_output_shape[-1] - tf.shape(x)[-1]
+            if padding_depth > 0:
+              x = tf.concat([x, tf.zeros((encoder_output_shape[0], encoder_output_shape[1], padding_depth))], 2)
             y = common_attention.multihead_attention(
                 common_layers.layer_preprocess(x, hparams),
                 encoder_output,
