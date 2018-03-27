@@ -786,8 +786,7 @@ def transformer_decoder(decoder_input,
             # padding decoder to encoder shape
             padding_depth = encoder_output_shape[-1] - x.get_shape().as_list()[-1]
             if padding_depth > 0:
-              padding_placeholder = tf.placeholder(tf.float32, shape=[encoder_output_shape[0], encoder_output_shape[1], padding_depth])
-              x = tf.concat([x, tf.zeros_like(padding_placeholder)], -1)
+              x = tf.pad(x, tf.constant([[0, padding_depth], [0, 0]]), 'CONSTANT')
             y = common_attention.multihead_attention(
                 common_layers.layer_preprocess(x, hparams),
                 encoder_output,
