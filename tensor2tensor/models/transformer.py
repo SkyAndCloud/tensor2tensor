@@ -691,7 +691,8 @@ def transformer_encoder(encoder_input,
               encoder_self_attention_bias,
               hparams.attention_key_channels or hparams.hidden_size,
               hparams.attention_value_channels or hparams.hidden_size,
-              hparams.hidden_size + layer * hparams.growth_rate,
+              #hparams.hidden_size + layer * hparams.growth_rate,
+              hparams.hidden_size,
               hparams.num_heads,
               hparams.attention_dropout,
               attention_type=hparams.self_attention_type,
@@ -779,11 +780,11 @@ def transformer_decoder(decoder_input,
               dropout_broadcast_dims=attention_dropout_broadcast_dims)
           x = common_layers.layer_postprocess(x, y, hparams)
         if encoder_output is not None:
-          encoder_output_shape = tf.shape(encoder_output)
+          encoder_output_shape = encoder_output.get_shape().as_list()
           with tf.variable_scope("encdec_attention"):
             # TODO(llion): Add caching.
             # padding decoder to encoder shape
-            padding_depth = encoder_output_shape[-1] - tf.shape(x)[-1]
+            padding_depth = encoder_output_shape[-1] - x.get_shape().as_list()[-1]
             if padding_depth > 0:
               x = tf.concat([x, tf.zeros((encoder_output_shape[0], encoder_output_shape[1], padding_depth))], 2)
             y = common_attention.multihead_attention(
@@ -792,7 +793,7 @@ def transformer_decoder(decoder_input,
                 encoder_decoder_attention_bias,
                 hparams.attention_key_channels or hparams.hidden_size,
                 hparams.attention_value_channels or hparams.hidden_size,
-                tf.shape(encoder_output)[-1],
+                encoder_output_shape[-1],
                 hparams.num_heads,
                 hparams.attention_dropout,
                 save_weights_to=save_weights_to,
@@ -845,9 +846,10 @@ def transformer_ffn_layer(x,
   if ffn_layer == "dense_relu_dense":
     # In simple convolution mode, use `pad_remover` to speed up processing.
     if pad_remover:
-      original_shape = common_layers.shape_list(x)
+      output_shape = common_layers.shape_list(x)
+      output_shape[-1] = hparams.growth_rate
       # Collapse `x` across examples, and remove padding positions.
-      x = tf.reshape(x, tf.concat([[-1], original_shape[2:]], axis=0))
+      x = tf.reshape(x, tf.concat([[-1], output_shape[2:]], axis=0))
       x = tf.expand_dims(pad_remover.remove(x), axis=0)
     conv_output = common_layers.dense_relu_dense(
         x,
@@ -858,7 +860,7 @@ def transformer_ffn_layer(x,
     if pad_remover:
       # Restore `conv_output` to the original shape of `x`, including padding.
       conv_output = tf.reshape(
-          pad_remover.restore(tf.squeeze(conv_output, axis=0)), original_shape)
+          pad_remover.restore(tf.squeeze(conv_output, axis=0)), output_shape)
     return conv_output
   elif ffn_layer == "conv_relu_conv":
     return common_layers.conv_relu_conv(
@@ -896,6 +898,8 @@ def transformer_base_v1():
   hparams = common_hparams.basic_params1()
   hparams.norm_type = "layer"
   hparams.hidden_size = 512
+  # Transformer layer hidden size growth rate. 8, 16, 32, 64, 128, 256, 512
+  hparams.growth_rate = 32
   hparams.batch_size = 4096
   hparams.max_length = 256
   hparams.clip_grad_norm = 0.  # i.e. no gradient clipping
@@ -962,8 +966,6 @@ def transformer_base():
   # transformer_base_v2.
   hparams = transformer_base_v2()
   hparams.optimizer_adam_beta2 = 0.997
-  # Transformer layer hidden size growth rate. 8, 16, 32, 64, 128, 256, 512
-  hparams.growth_rate = 32
   # New way of specifying learning rate schedule.
   # Equivalent to previous version.
   hparams.learning_rate_schedule = (
