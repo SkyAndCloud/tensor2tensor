@@ -902,8 +902,6 @@ def transformer_base_v1():
   hparams = common_hparams.basic_params1()
   hparams.norm_type = "layer"
   hparams.hidden_size = 512
-  # Transformer layer hidden size growth rate. 8, 16, 32, 64, 128, 256, 512
-  hparams.growth_rate = 32
   hparams.batch_size = 4096
   hparams.max_length = 256
   hparams.clip_grad_norm = 0.  # i.e. no gradient clipping
@@ -947,6 +945,8 @@ def transformer_base_v1():
   hparams.add_hparam("use_pad_remover", True)
   hparams.add_hparam("self_attention_type", "dot_product")
   hparams.add_hparam("max_relative_position", 0)
+  # Transformer layer hidden size growth rate. 8, 16, 32, 64, 128, 256, 512
+  hparams.add_hparam("growth_rate", 32)
   return hparams
 
 
