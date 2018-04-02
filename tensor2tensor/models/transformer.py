@@ -707,8 +707,6 @@ def transformer_encoder(encoder_input,
           x = common_layers.layer_postprocess(x, y, hparams)
       dense_connection.append(x)
       if layer == (hparams.num_hidden_layers - 1):
-        tmp = tf.concat(dense_connection, 2)
-        print('enc -> {}'.format(tmp.get_shape().as_list()))
         x = common_layers.dense(tf.concat(dense_connection, 2), hparams.hidden_size, use_bias=True, name="enc_dense")
     # if normalization is done in layer_preprocess, then it shuold also be done
     # on the output, since the output can grow very large, being the sum of
@@ -803,8 +801,6 @@ def transformer_decoder(decoder_input,
           x = common_layers.layer_postprocess(x, y, hparams)
       dense_connection.append(x)
       if layer == (hparams.num_hidden_layers - 1):
-        tmp = tf.concat(dense_connection, 2)
-        print('dec -> {}'.format(tmp.get_shape().as_list()))
         x = common_layers.dense(tf.concat(dense_connection, 2), hparams.hidden_size, use_bias=True, name="dec_dense")
     # if normalization is done in layer_preprocess, then it shuold also be done
     # on the output, since the output can grow very large, being the sum of
