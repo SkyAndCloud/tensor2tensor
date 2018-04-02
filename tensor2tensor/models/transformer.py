@@ -680,6 +680,7 @@ def transformer_encoder(encoder_input,
     pad_remover = None
     if hparams.use_pad_remover and not common_layers.is_on_tpu():
       pad_remover = expert_utils.PadRemover(padding)
+    dense_connection = [x]
     for layer in xrange(hparams.num_encoder_layers or
                         hparams.num_hidden_layers):
       with tf.variable_scope("layer_%d" % layer):
@@ -704,6 +705,11 @@ def transformer_encoder(encoder_input,
               common_layers.layer_preprocess(x, hparams), hparams, pad_remover,
               conv_padding="SAME", nonpadding_mask=nonpadding)
           x = common_layers.layer_postprocess(x, y, hparams)
+      dense_connection.append(x)
+      if layer == (hparams.num_hidden_layers - 1):
+        tmp = tf.concat(dense_connection, 2)
+        print('enc -> {}'.format(tmp.get_shape().as_list()))
+        x = common_layers.dense(tf.concat(dense_connection, 2), hparams.hidden_size, use_bias=True, name="enc_dense")
     # if normalization is done in layer_preprocess, then it shuold also be done
     # on the output, since the output can grow very large, being the sum of
     # a whole stack of unnormalized layer outputs.
@@ -751,6 +757,7 @@ def transformer_decoder(decoder_input,
       common_layers.comma_separated_string_to_integer_list(
           getattr(hparams, "attention_dropout_broadcast_dims", "")))
   with tf.variable_scope(name):
+    dense_connection = [x]
     for layer in xrange(hparams.num_decoder_layers or
                         hparams.num_hidden_layers):
       layer_name = "layer_%d" % layer
@@ -794,6 +801,11 @@ def transformer_decoder(decoder_input,
               common_layers.layer_preprocess(x, hparams), hparams,
               conv_padding="LEFT", nonpadding_mask=nonpadding)
           x = common_layers.layer_postprocess(x, y, hparams)
+      dense_connection.append(x)
+      if layer == (hparams.num_hidden_layers - 1):
+        tmp = tf.concat(dense_connection, 2)
+        print('dec -> {}'.format(tmp.get_shape().as_list()))
+        x = common_layers.dense(tf.concat(dense_connection, 2), hparams.hidden_size, use_bias=True, name="dec_dense")
     # if normalization is done in layer_preprocess, then it shuold also be done
     # on the output, since the output can grow very large, being the sum of
     # a whole stack of unnormalized layer outputs.
