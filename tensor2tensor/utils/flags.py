@@ -52,7 +52,7 @@ try:
 except:  # pylint: disable=bare-except
   pass
 
-flags.DEFINE_integer("train_steps", 250000,
+flags.DEFINE_integer("train_steps", 500000,
                      "The number of steps to run training for.")
 flags.DEFINE_string("eval_early_stopping_metric", "loss",
                     "If --eval_early_stopping_steps is not None, then stop "

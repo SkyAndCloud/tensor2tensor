@@ -683,7 +683,7 @@ def transformer_encoder(encoder_input,
     for layer in xrange(hparams.num_encoder_layers or
                         hparams.num_hidden_layers):
       with tf.variable_scope("layer_%d" % layer):
-        layer_input = common_layers.layer_preprocess(tf.identity(x), hparams)
+        layer_input = tf.identity(x)
         with tf.variable_scope("self_attention"):
           y = common_attention.multihead_attention(
               common_layers.layer_preprocess(x, hparams),
@@ -705,14 +705,18 @@ def transformer_encoder(encoder_input,
           y = transformer_ffn_layer(
               common_layers.layer_preprocess(x, hparams), hparams, pad_remover,
               conv_padding="SAME", nonpadding_mask=nonpadding)
-          # y's depth changed to hidden_size + layer * growth_rate
-          y = tf.concat([y, layer_input], 2)
           # previous_value is None, only do dropout operation
-          x = common_layers.layer_postprocess(None, y, hparams)
+          y = common_layers.layer_postprocess(None, y, hparams)
+          # x's depth changed to hidden_size + (layer + 1) * growth_rate
+          x = tf.concat([y, layer_input], 2)
+
     # if normalization is done in layer_preprocess, then it shuold also be done
     # on the output, since the output can grow very large, being the sum of
     # a whole stack of unnormalized layer outputs.
-    return common_layers.layer_preprocess(x, hparams)
+    return common_layers.layer_preprocess(
+      common_layers.dense(
+        x, hparams.hidden_size, use_bias=True, activation=tf.nn.relu, name="bottleneck"),
+      hparams)
 
 
 def transformer_decoder(decoder_input,
@@ -761,7 +765,7 @@ def transformer_decoder(decoder_input,
       layer_name = "layer_%d" % layer
       layer_cache = cache[layer_name] if cache is not None else None
       with tf.variable_scope(layer_name):
-        layer_input = common_layers.layer_preprocess(tf.identity(x), hparams)
+        layer_input = tf.identity(x)
         with tf.variable_scope("self_attention"):
           y = common_attention.multihead_attention(
               common_layers.layer_preprocess(x, hparams),
@@ -784,16 +788,16 @@ def transformer_decoder(decoder_input,
           with tf.variable_scope("encdec_attention"):
             # TODO(llion): Add caching.
             # padding decoder to encoder shape
-            padding_depth = encoder_output_shape[-1] - x.get_shape().as_list()[-1]
-            if padding_depth > 0:
-              x = tf.pad(x, tf.constant([[0, 0], [0, 0], [0, padding_depth]]), 'CONSTANT')
+            # padding_depth = encoder_output_shape[-1] - x.get_shape().as_list()[-1]
+            # if padding_depth > 0:
+            #   x = tf.pad(x, tf.constant([[0, 0], [0, 0], [0, padding_depth]]), 'CONSTANT')
             y = common_attention.multihead_attention(
                 common_layers.layer_preprocess(x, hparams),
                 encoder_output,
                 encoder_decoder_attention_bias,
                 hparams.attention_key_channels or hparams.hidden_size,
                 hparams.attention_value_channels or hparams.hidden_size,
-                encoder_output_shape[-1],
+                hparams.hidden_size + layer * hparams.growth_rate,
                 hparams.num_heads,
                 hparams.attention_dropout,
                 save_weights_to=save_weights_to,
@@ -805,17 +809,18 @@ def transformer_decoder(decoder_input,
           y = transformer_ffn_layer(
               common_layers.layer_preprocess(x, hparams), hparams,
               conv_padding="LEFT", nonpadding_mask=nonpadding)
-          # y's depth changed to hidden_size + layer * growth_rate
-          y = tf.concat([y, layer_input], 2)
-          # if last decoder layer, y's depth come back to hidden_size
-          if layer == (hparams.num_hidden_layers - 1):
-              y = common_layers.dense(y, hparams.hidden_size, use_bias=True, activation=tf.nn.relu, name="bottleneck")
           # previous_value is None, only do dropout operation
-          x = common_layers.layer_postprocess(None, y, hparams)
+          y = common_layers.layer_postprocess(None, y, hparams)
+          # x's depth changed to hidden_size + (layer + 1) * growth_rate
+          x = tf.concat([y, layer_input], 2)
+
     # if normalization is done in layer_preprocess, then it shuold also be done
     # on the output, since the output can grow very large, being the sum of
     # a whole stack of unnormalized layer outputs.
-    return common_layers.layer_preprocess(x, hparams)
+    return common_layers.layer_preprocess(
+      common_layers.dense(
+        x, hparams.hidden_size, use_bias=True, activation=tf.nn.relu, name="bottleneck"),
+      hparams)
 
 
 def transformer_ffn_layer(x,
