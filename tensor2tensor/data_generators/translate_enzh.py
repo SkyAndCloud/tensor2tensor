@@ -46,19 +46,14 @@ EOS = text_encoder.EOS_ID
 #
 # News Commentary, around 220k lines
 # This dataset is only a small fraction of full WMT17 task
-_NC_TRAIN_DATASETS = [[
-    "http://data.statmt.org/wmt17/translation-task/training-parallel-nc-v12"
-    ".tgz", [
-        "training/news-commentary-v12.zh-en.en",
-        "training/news-commentary-v12.zh-en.zh"
-    ]
-]]
+_NC_TRAIN_DATASETS = [
+  ["", ["train.en", "train.zh"]]
+]
 
 # Test set from News Commentary. 2000 lines
-_NC_TEST_DATASETS = [[
-    "http://data.statmt.org/wmt17/translation-task/dev.tgz",
-    ("dev/newsdev2017-enzh-src.en.sgm", "dev/newsdev2017-enzh-ref.zh.sgm")
-]]
+_NC_TEST_DATASETS = [
+  ["", ["val.en", "val.zh"]]
+]
 
 # UN parallel corpus. 15,886,041 lines
 # Visit source website to download manually:
@@ -212,9 +207,9 @@ class TranslateEnzhWmt32k(translate.TranslateProblem):
       tmp_filepath = os.path.join(tmp_dir, filename)
       if tf.gfile.Exists(tmp_filepath):
         full_dataset += dataset
-      else:
-        tf.logging.info("[TranslateEzhWmt] dataset incomplete, you need to "
-                        "manually download %s" % filename)
+      # else:
+      #   tf.logging.info("[TranslateEzhWmt] dataset incomplete, you need to "
+      #                   "manually download %s" % filename)
     return full_dataset
 
   def generate_encoded_samples(self, data_dir, tmp_dir, dataset_split):
@@ -238,7 +233,7 @@ class TranslateEnzhWmt32k(translate.TranslateProblem):
         target_datasets,
         file_byte_budget=1e8)
     tag = "train" if train else "dev"
-    filename_base = "wmt_enzh_%sk_tok_%s" % (self.approx_vocab_size, tag)
+    filename_base = "enzh_%sk_tok_%s" % (self.approx_vocab_size, tag)
     data_path = translate.compile_data(tmp_dir, datasets, filename_base)
     return text_problems.text2text_generate_encoded(
         text_problems.text2text_txt_iterator(data_path + ".lang1",
